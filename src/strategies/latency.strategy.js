@@ -1,23 +1,30 @@
+import { WeightedStrategy } from './weighted.strategy.js';
+
 export class LatencyStrategy {
-  /**
-   * Selects the vendor with the lowest historical average latency.
-   */
-  selectVendor(vendors, metricsService, requirements = {}) {
+  constructor() {
+    this.weightedSelector = new WeightedStrategy();
+  }
+
+  selectVendor(vendors, metricsService) {
     if (!vendors || vendors.length === 0) return null;
 
-    // Map vendors to their current health/latency stats
     const vendorsWithMetrics = vendors.map(vendor => {
       const health = metricsService.getHealth(vendor._id.toString());
       return {
-        ...vendor.toObject(), // Convert Mongoose document to plain object
-        avgLatency: health.avgLatency > 0 ? health.avgLatency : vendor.maxLatencyMs // Use max allowed if no data yet
+        vendor,
+        avgLatency: health.avgLatency > 0 ? health.avgLatency : vendor.maxLatencyMs
       };
     });
 
-    // Sort ascending by latency (fastest first)
-    vendorsWithMetrics.sort((a, b) => a.avgLatency - b.avgLatency);
+    // 1. Find the absolute fastest latency
+    const minLatency = Math.min(...vendorsWithMetrics.map(v => v.avgLatency));
 
-    // Return the fastest vendor
-    return vendors.find(v => v._id.toString() === vendorsWithMetrics[0]._id.toString());
+    // 2. Group ALL vendors that share this fastest time
+    const tiedFastestVendors = vendorsWithMetrics
+      .filter(v => v.avgLatency === minLatency)
+      .map(v => v.vendor);
+
+    // 3. Break the tie using the Weighted Strategy
+    return this.weightedSelector.selectVendor(tiedFastestVendors);
   }
 }

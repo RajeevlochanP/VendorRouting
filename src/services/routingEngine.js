@@ -20,9 +20,18 @@ export class RoutingEngine {
     }
 
     // 2. Determine the Business Strategy
-    let strategyType = 'WEIGHTED'; // Default
-    if (requirements.preferLowCost) strategyType = 'COST';
-    else if (requirements.preferFastest) strategyType = 'LATENCY';
+    let strategyType = 'WEIGHTED'; // The ultimate default
+    
+    const wantsCheap = requirements.preferLowCost === true;
+    const wantsFast = requirements.preferFastest === true;
+
+    if (wantsCheap && wantsFast) {
+      strategyType = 'SCORING';
+    } else if (wantsCheap) {
+      strategyType = 'COST';
+    } else if (wantsFast) {
+      strategyType = 'LATENCY';
+    }
     
     const strategy = StrategyFactory.getStrategy(strategyType);
 

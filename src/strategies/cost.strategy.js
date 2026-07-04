@@ -1,11 +1,16 @@
+import { WeightedStrategy } from './weighted.strategy.js';
+
 export class CostStrategy {
-  /**
-   * Selects the cheapest vendor that also meets the max latency requirement if provided.
-   */
+  constructor() {
+    this.weightedSelector = new WeightedStrategy();
+  }
+
   selectVendor(vendors, metricsService, requirements = {}) {
+    if (!vendors || vendors.length === 0) return null;
+
     let eligibleVendors = vendors;
 
-    // If maxLatencyMs is provided, filter out vendors whose historical average is too slow
+    // Filter by max latency if requested
     if (requirements.maxLatencyMs) {
       eligibleVendors = vendors.filter(v => {
         const health = metricsService.getHealth(v._id.toString());
@@ -13,12 +18,15 @@ export class CostStrategy {
       });
     }
 
-    // Fallback if all eligible vendors are too slow, use the original list
-    if (eligibleVendors.length === 0) {
-      eligibleVendors = vendors;
-    }
+    if (eligibleVendors.length === 0) eligibleVendors = vendors;
 
-    // Sort by cost ascending and return the cheapest
-    return eligibleVendors.sort((a, b) => a.costPerRequest - b.costPerRequest)[0];
+    // 1. Find the absolute lowest cost in the pool
+    const minCost = Math.min(...eligibleVendors.map(v => v.costPerRequest));
+
+    // 2. Group ALL vendors that share this exact lowest cost
+    const tiedCheapestVendors = eligibleVendors.filter(v => v.costPerRequest === minCost);
+
+    // 3. Break the tie using the Weighted Strategy
+    return this.weightedSelector.selectVendor(tiedCheapestVendors);
   }
 }
