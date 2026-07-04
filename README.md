@@ -1,115 +1,292 @@
 # Intelligent Vendor Routing Platform
 
-This platform is a highly scalable, configuration-driven routing engine built in Node.js. It evaluates multiple vendors capable of fulfilling a given request (e.g., PAN verification, payment processing) and dynamically routes traffic to the best vendor based on real-time metrics, cost constraints, and latency limits.
+Node.js + Express API for a configuration-driven API gateway that routes verification requests across vendors using a Dynamic Strategy Pattern and implicit failover. The platform supports Gemini AI integration for context-aware vendor configuration generation backed by live metrics and routing logs.
 
-## Core Architecture
+## Architecture Highlights
 
-### Strategy Pattern (Dynamic Decision Making)
-The application dynamically selects the best routing strategy based on the client's payload `requirements`. Strategies evaluate live metrics and vendor configuration:
-- **WEIGHTED**: Splits traffic by statically assigned weights.
-- **COST**: Always picks the cheapest vendor that is currently healthy.
-- **LATENCY**: Routes to the vendor with the lowest moving average response time.
-- **SCORING**: Calculates a composite score taking both latency and cost into account.
+- **Strategy Pattern routing**
+  - `Weighted`
+  - `Cost`
+  - `Latency`
+  - `DynamicScoring`
+- **Implicit failover**
+  - Vendor execution is wrapped in a `while` loop that retries alternative eligible vendors.
+  - Failed vendors are skipped through Circuit Breaker state.
+  - Routing continues until a successful vendor response or the candidate pool is exhausted.
+- **VendorExecutionClient**
+  - Performs dynamic JSON request mapping.
+  - Performs dynamic JSON response mapping.
+  - Detects vendor-defined system errors via `systemErrorIndicator`.
+  - Supports dual-mode execution:
+    - `Simulated`: deterministic local execution for development and tests.
+    - `Live`: outbound HTTP execution against configured vendor endpoints.
+- **MetricsService**
+  - In-memory O(1) metric lookup/update path.
+  - Tracks success rate, latency, cost, failure counts, and circuit health.
+  - Feeds routing strategies and AI config generation.
 
-### Circuit Breaker & Failover Loop
-The `RoutingEngine` features an enterprise-grade failover mechanism:
-- If a vendor fails (e.g., throws an error, or timeout), the engine records the failure.
-- If the error rate crosses the acceptable threshold, the circuit breaker opens for that vendor (making it ineligible for future routing until health restores).
-- On failure, the loop automatically falls back and routes the same payload to the *next* best vendor (up to 2 retries).
+## Prerequisites
 
-### Dynamic Request / Response Templating
-This is the "No-Code" magic of the platform. Vendors require different payload structures, authentication headers, and multi-step interactions. Instead of writing custom code per vendor:
-- Each `Vendor` document in MongoDB defines an `integration.steps` array.
-- This includes HTTP method, endpoints, auth type, and powerful `requestTemplate` and `responseMapping` json configurations to dynamically map our uniform API payloads to the vendor's specific schema before making the HTTP call.
+- Node.js `>= 20.x`
+- npm `>= 10.x`
+- MongoDB connection string
+- Gemini API key
 
-### Agentic AI Configuration
-The platform integrates with Google Generative AI (Gemini SDK) via `POST /ai/generate-config`. It translates plain natural language requests like *"Switch 70% traffic to Vendor A, but use Vendor B if latency spikes above 2000ms"* into valid JSON routing metadata that can be instantly saved into MongoDB.
+## Environment Setup
 
----
+Create `.env`:
 
-## API Endpoints
+```env
+PORT=3000
+MONGO_URI=mongodb://localhost:27017/vendor-routing
+GEMINI_API_KEY=your_gemini_api_key_here
+VENDORA_API_KEY=your_vendora_api_key_here
+VENDORB_API_KEY=your_vendorb_api_key_here
+```
 
-### 1. Vendor Management
+## Installation & Running
 
-**`POST /vendors`** - Register a New Vendor
+```bash
+npm install
+```
+
+Start production mode:
+
+```bash
+npm start
+```
+
+Start development mode:
+
+```bash
+npm run dev
+```
+
+Base URL:
+
+```text
+http://localhost:3000
+```
+
+## API Documentation
+
+### Create Vendor Config
+
+`POST /vendors`
+
 ```bash
 curl -X POST http://localhost:3000/vendors \
--H "Content-Type: application/json" \
--d '{
-  "name": "Vendor A",
-  "capability": "PAN_VERIFICATION",
-  "priority": 1,
-  "weight": 70,
-  "costPerRequest": 0.05,
-  "maxLatencyMs": 2000,
-  "rateLimitPerMinute": 1000,
-  "integration": {
-    "steps": [{
-      "stepOrder": 1,
-      "method": "POST",
-      "endpoint": "https://api.vendora.com/verify",
-      "auth": { "type": "API_KEY", "keyName": "x-api-key", "location": "HEADER" }
-    }]
-  }
-}'
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "VendorA",
+    "capabilities": ["PAN_VERIFICATION"],
+    "mode": "Simulated",
+    "endpoint": "https://api.vendora.example.com/pan/verify",
+    "method": "POST",
+    "headers": {
+      "Authorization": "Bearer ${VENDORA_API_KEY}",
+      "Content-Type": "application/json"
+    },
+    "requestMapping": {
+      "pan": "$.pan",
+      "name": "$.name",
+      "dob": "$.dob"
+    },
+    "responseMapping": {
+      "verified": "$.result.isValid",
+      "status": "$.result.status",
+      "referenceId": "$.meta.requestId"
+    },
+    "systemErrorIndicator": {
+      "path": "$.error.code",
+      "values": ["SYSTEM_ERROR", "TIMEOUT", "RATE_LIMITED"]
+    },
+    "routing": {
+      "weight": 70,
+      "cost": 1.25,
+      "priority": 1
+    }
+  }'
 ```
 
-**`GET /vendors`** - Get all Vendors
-```bash
-curl http://localhost:3000/vendors
+Expected response:
+
+```json
+{
+  "id": "64f8c1f2a9b7e2a4c9a90111",
+  "name": "VendorA",
+  "capabilities": ["PAN_VERIFICATION"],
+  "mode": "Simulated",
+  "enabled": true,
+  "createdAt": "2026-07-05T10:00:00.000Z"
+}
 ```
 
-### 2. Routing Engine
+### Route Request
 
-**`POST /route`** - Execute a Request (Dynamically Routed)
+`POST /route`
+
 ```bash
 curl -X POST http://localhost:3000/route \
--H "Content-Type: application/json" \
--d '{
+  -H "Content-Type: application/json" \
+  -d '{
+    "capability": "PAN_VERIFICATION",
+    "requirements": {
+      "preferLowCost": true
+    },
+    "payload": {
+      "pan": "ABCDE1234F",
+      "name": "Jane Doe",
+      "dob": "1990-01-15"
+    }
+  }'
+```
+
+Expected response:
+
+```json
+{
   "capability": "PAN_VERIFICATION",
-  "payload": {
-    "panNumber": "ABCDE1234F"
-  },
-  "requirements": {
-    "preferFastest": true,
-    "preferLowCost": false,
-    "maxLatencyMs": 1500
+  "vendor": "VendorA",
+  "strategy": "Cost",
+  "status": "SUCCESS",
+  "attempts": [
+    {
+      "vendor": "VendorA",
+      "status": "SUCCESS",
+      "latencyMs": 142
+    }
+  ],
+  "data": {
+    "verified": true,
+    "status": "VALID",
+    "referenceId": "req_9f31b7"
   }
-}'
+}
 ```
 
-### 3. Monitoring
+### Read Vendor Metrics
 
-**`GET /vendor-metrics`** - View Live Vendor Health (In-Memory)
+`GET /vendor-metrics`
+
 ```bash
-curl http://localhost:3000/vendor-metrics
+curl -X GET http://localhost:3000/vendor-metrics
 ```
 
-**`GET /routing-logs`** - View the 50 Most Recent Request Logs
-```bash
-curl http://localhost:3000/routing-logs
+Expected response:
+
+```json
+[
+  {
+    "vendor": "VendorA",
+    "capability": "PAN_VERIFICATION",
+    "status": "healthy",
+    "successRate": "98.20%",
+    "averageLatency": "142 ms",
+    "costPerRequest": "1.25",
+    "totalRequests": 5000,
+    "failedRequests": 90,
+    "circuitBreaker": "closed"
+  },
+  {
+    "vendor": "VendorB",
+    "capability": "PAN_VERIFICATION",
+    "status": "degraded",
+    "successRate": "86.10%",
+    "averageLatency": "310 ms",
+    "costPerRequest": "0.95",
+    "totalRequests": 5000,
+    "failedRequests": 695,
+    "circuitBreaker": "half_open"
+  }
+]
 ```
 
-### 4. AI Agentic Integration
+## Agentic AI Bonus Feature
 
-**`POST /ai/generate-config`** - Generate Vendor JSON from Natural Language
+`POST /ai/generate-config` generates vendor routing configuration from a natural language prompt.
+
+- Uses **Gemini 1.5 Flash**.
+- Context-aware generation:
+  - Ingests live MongoDB vendor metrics.
+  - Ingests recent routing logs.
+  - Penalizes failing, slow, or circuit-open vendors in generated JSON.
+  - Emits configuration ready for `POST /vendors`.
+
 ```bash
 curl -X POST http://localhost:3000/ai/generate-config \
--H "Content-Type: application/json" \
--d '{
-  "prompt": "Use Vendor A for 70% traffic, Vendor B for 30%, but switch to Vendor C if latency crosses 2 seconds or error rate is above 5%."
-}'
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Create vendor configs for PAN verification. Prefer low cost vendors, but penalize vendors with recent system errors or open circuits."
+  }'
 ```
 
----
+Expected response:
 
-## Setup & Running
-
-1. **Install Dependencies:** `npm install`
-2. **Environment Variables (`.env`):**
-   ```env
-   PORT=3000
-   MONGO_URI=mongodb://localhost:27017/vendor-routing
-   GEMINI_API_KEY=your_gemini_api_key_here
-   ```
-3. **Start Server:** `npm start`
+```json
+[
+  {
+    "name": "VendorA",
+    "capabilities": ["PAN_VERIFICATION"],
+    "mode": "Live",
+    "endpoint": "https://api.vendora.example.com/pan/verify",
+    "method": "POST",
+    "headers": {
+      "Authorization": "Bearer ${VENDORA_API_KEY}",
+      "Content-Type": "application/json"
+    },
+    "requestMapping": {
+      "pan": "$.pan",
+      "name": "$.name",
+      "dob": "$.dob"
+    },
+    "responseMapping": {
+      "verified": "$.result.isValid",
+      "status": "$.result.status",
+      "referenceId": "$.meta.requestId"
+    },
+    "systemErrorIndicator": {
+      "path": "$.error.code",
+      "values": ["SYSTEM_ERROR", "TIMEOUT", "RATE_LIMITED"]
+    },
+    "routing": {
+      "strategy": "DynamicScoring",
+      "weight": 80,
+      "cost": 1.25,
+      "penaltyScore": 0
+    }
+  },
+  {
+    "name": "VendorB",
+    "capabilities": ["PAN_VERIFICATION"],
+    "mode": "Live",
+    "endpoint": "https://api.vendorb.example.com/identity/pan",
+    "method": "POST",
+    "headers": {
+      "x-api-key": "${VENDORB_API_KEY}",
+      "Content-Type": "application/json"
+    },
+    "requestMapping": {
+      "panNumber": "$.pan",
+      "fullName": "$.name",
+      "dateOfBirth": "$.dob"
+    },
+    "responseMapping": {
+      "verified": "$.verification.panVerified",
+      "status": "$.verification.status",
+      "referenceId": "$.request.reference"
+    },
+    "systemErrorIndicator": {
+      "path": "$.statusCode",
+      "values": ["E500", "E_TIMEOUT", "E_RATE_LIMIT"]
+    },
+    "routing": {
+      "strategy": "DynamicScoring",
+      "weight": 35,
+      "cost": 0.95,
+      "penaltyScore": 45,
+      "penaltyReason": "Recent system errors and degraded circuit breaker state"
+    }
+  }
+]
+```

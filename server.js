@@ -17,7 +17,7 @@ class Server {
     const expressApp = this.appInstance.getExpressInstance();
 
     this.httpServer = expressApp.listen(this.port, () => {
-      console.log(`Intelligent Vendor Router running on port [${this.port}]`);
+      console.log(`Vendor Router running on port [${this.port}]`);
     });
 
     this.setupGracefulShutdown();
