@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import { VendorRouter } from './routes/vendor.router.js';
+import { ApiRouter } from './routes/api.router.js';
 
 export class App {
   constructor() {
@@ -16,9 +18,14 @@ export class App {
   }
 
   configureRoutes() {
+
     this.app.get('/health', (req, res) => {
       res.status(200).json({ status: 'UP', timestamp: new Date() });
     });
+
+    
+    this.app.use('/', new ApiRouter().getRouter());
+    this.app.use('/vendors', new VendorRouter().getRouter());
 
     // TODO: Instantiated routers from src/routes will be mounted here
     // Example: this.app.use('/api/v1/vendors', new VendorRouter().getRouter());
