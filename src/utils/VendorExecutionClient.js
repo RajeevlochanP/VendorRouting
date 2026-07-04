@@ -49,12 +49,23 @@ export class VendorExecutionClient {
         });
 
         if (!response.ok) {
+          if (response.status >= 500 || response.status === 429) {
+            throw new Error(`HTTP System Error: ${response.status} ${response.statusText}`);
+          }
           throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
         }
 
         const rawJson = await response.json();
 
-        // 4. Extract data using Response Mapping
+        if (step.systemErrorIndicator && step.systemErrorIndicator.keyPath) {
+          const checkMapping = { errorCheck: step.systemErrorIndicator.keyPath };
+          const extractedCheck = this._extractResponseMapping(checkMapping, rawJson);
+          
+          if (String(extractedCheck.errorCheck) === String(step.systemErrorIndicator.failureValue)) {
+            throw new Error(`Vendor payload indicated system failure: ${step.systemErrorIndicator.failureValue}`);
+          }
+        }
+
         currentResponse = this._extractResponseMapping(step.responseMapping, rawJson);
       }
 
@@ -66,6 +77,7 @@ export class VendorExecutionClient {
       };
 
     } catch (error) {
+      // Throwing this bubbles it straight back to the RoutingEngine's catch block to trigger failover
       throw new Error(`Live execution failed for ${vendor.name}: ${error.message}`);
     }
   }

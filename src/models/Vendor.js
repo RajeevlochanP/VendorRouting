@@ -29,7 +29,11 @@ const VendorSchema = new mongoose.Schema({
       requestTemplate: { type: mongoose.Schema.Types.Mixed },
       
       // Response Mapping: Maps vendor's weird response back to your standard
-      responseMapping: { type: mongoose.Schema.Types.Mixed }
+      responseMapping: { type: mongoose.Schema.Types.Mixed },
+      systemErrorIndicator: {
+        keyPath: { type: String }, // e.g., "$.error.code"
+        failureValue: { type: String } // e.g., "PROVIDER_DOWN" or "RATE_LIMIT"
+      }
     }]
   }
 }, { timestamps: true });
