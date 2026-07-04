@@ -9,11 +9,8 @@ export class VendorRouter {
   }
 
   initializeRoutes() {
-    // Registers a new vendor capability
     this.router.post('/', this.controller.registerVendor.bind(this.controller));
-    
-    // Fetches all registered vendors
-    this.router.get('/', this.controller.getVendors.bind(this.controller));
+    this.router.get('/', this.controller.getAllVendors.bind(this.controller));
   }
 
   getRouter() {

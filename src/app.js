@@ -18,24 +18,24 @@ export class App {
   }
 
   configureRoutes() {
-
     this.app.get('/health', (req, res) => {
       res.status(200).json({ status: 'UP', timestamp: new Date() });
     });
 
+    const apiRouter = new ApiRouter();
+    const vendorRouter = new VendorRouter();
 
-    this.app.use('/', new ApiRouter().getRouter());
-    this.app.use('/vendors', new VendorRouter().getRouter());
-
+    this.app.use('/', apiRouter.getRouter());
+    this.app.use('/vendors', vendorRouter.getRouter());
   }
 
   configureErrorHandling() {
     this.app.use((err, req, res, next) => {
       console.error('Unhandled Server Exception:', err.stack);
-      res.status(500).json({
+      res.status(err.status || 500).json({
         status: 'ERROR',
-        message: 'An internal server error occurred.',
-        error: process.env.NODE_ENV === 'development' ? err.message : {}
+        message: err.message || 'An internal server error occurred.',
+        error: process.env.NODE_ENV === 'development' ? err.stack : {}
       });
     });
   }

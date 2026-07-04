@@ -9,15 +9,10 @@ export class ApiRouter {
   }
 
   initializeRoutes() {
-    // The core routing endpoint
-    this.router.post('/route', this.controller.processRoute.bind(this.controller));
-    
-    // Metrics and logging endpoints
-    this.router.get('/vendor-metrics', this.controller.getMetrics.bind(this.controller));
-    this.router.get('/routing-logs', this.controller.getLogs.bind(this.controller));
-    
-    // AI Bonus endpoint
-    this.router.post('/ai/config', this.controller.generateAiConfig.bind(this.controller));
+    this.router.post('/route', this.controller.executeRoute.bind(this.controller));
+    this.router.get('/vendor-metrics', this.controller.getVendorMetrics.bind(this.controller));
+    this.router.get('/routing-logs', this.controller.getRoutingLogs.bind(this.controller));
+    this.router.post('/ai/generate-config', this.controller.generateAiConfig.bind(this.controller));
   }
 
   getRouter() {
