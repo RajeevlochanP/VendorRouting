@@ -1,23 +1,22 @@
-// Import Vendor model if doing direct DB operations, or a VendorService if abstracted
-import Vendor from '../models/Vendor.js'; 
+import { Vendor } from '../models/Vendor.js';
 
 export class VendorController {
   async registerVendor(req, res, next) {
     try {
-      // TODO: Extract vendor details from req.body
-      // TODO: Save to DB
-      // TODO: Return 201 Created
+      const vendor = new Vendor(req.body);
+      const savedVendor = await vendor.save();
+      res.status(201).json({ status: 'SUCCESS', data: savedVendor });
     } catch (error) {
-      next(error);
+      res.status(400).json({ status: 'ERROR', message: error.message });
     }
   }
 
   async getVendors(req, res, next) {
     try {
-      // TODO: Query all vendors from DB (optionally filter by req.query)
-      // TODO: Return 200 OK
+      const vendors = await Vendor.find({});
+      res.status(200).json({ status: 'SUCCESS', count: vendors.length, data: vendors });
     } catch (error) {
-      next(error);
+      res.status(500).json({ status: 'ERROR', message: error.message });
     }
   }
 }

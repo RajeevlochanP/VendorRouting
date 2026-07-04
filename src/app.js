@@ -23,12 +23,10 @@ export class App {
       res.status(200).json({ status: 'UP', timestamp: new Date() });
     });
 
-    
+
     this.app.use('/', new ApiRouter().getRouter());
     this.app.use('/vendors', new VendorRouter().getRouter());
 
-    // TODO: Instantiated routers from src/routes will be mounted here
-    // Example: this.app.use('/api/v1/vendors', new VendorRouter().getRouter());
   }
 
   configureErrorHandling() {

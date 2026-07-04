@@ -1,6 +1,6 @@
 import { RoutingEngine } from '../services/routingEngine.js';
-import { MetricsService } from '../services/metrics.service.js';
-import { AiAgentService } from '../services/aiAgent.service.js';
+import { metricsService } from '../services/metrics.service.js';
+import { RouteLog } from '../models/RouteLog.js';
 
 export class RouteController {
   constructor() {
@@ -11,39 +11,36 @@ export class RouteController {
 
   async processRoute(req, res, next) {
     try {
-      // TODO: Extract capability and payload from req.body
-      // TODO: Call this.engine.executeRoute(capability, payload)
-      // TODO: Return standardized response
+      // Extract requirements as per the sample input
+      const { capability, payload, requirements } = req.body;
+      
+      if (!capability) {
+        return res.status(400).json({ status: 'ERROR', message: 'Capability is required.' });
+      }
+
+      // Pass requirements directly to the engine
+      const result = await this.engine.executeRoute(capability, payload, requirements);
+      res.status(200).json(result);
     } catch (error) {
-      next(error);
+      res.status(500).json({ status: 'ERROR', message: error.message });
     }
   }
 
   async getMetrics(req, res, next) {
     try {
-      // TODO: Fetch live metrics from this.metrics
-      // TODO: Return 200 OK
+      const metrics = metricsService.getAllMetrics();
+      res.status(200).json({ status: 'SUCCESS', data: metrics });
     } catch (error) {
-      next(error);
+      res.status(500).json({ status: 'ERROR', message: error.message });
     }
   }
 
   async getLogs(req, res, next) {
     try {
-      // TODO: Fetch RouteLogs from DB
-      // TODO: Return 200 OK
+      const logs = await RouteLog.find({}).sort({ createdAt: -1 }).limit(50);
+      res.status(200).json({ status: 'SUCCESS', data: logs });
     } catch (error) {
-      next(error);
-    }
-  }
-
-  async generateAiConfig(req, res, next) {
-    try {
-      // TODO: Extract natural language prompt from req.body
-      // TODO: Call this.aiAgent.generateRoutingConfig(prompt)
-      // TODO: Return generated JSON
-    } catch (error) {
-      next(error);
+      res.status(500).json({ status: 'ERROR', message: error.message });
     }
   }
 }

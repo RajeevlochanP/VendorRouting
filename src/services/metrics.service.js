@@ -1,19 +1,40 @@
 // Acts as an in-memory store for fast metric tracking
 export class MetricsService {
   constructor() {
-    // Use a Map or Object to store live metrics per vendor ID
-    this.store = new Map(); 
+    this.metrics = new Map();
   }
 
-  recordSuccess(vendorId, latencyMs) {
-    // TODO: Update success count, calculate moving average latency
+  _initialize(vendorId) {
+    if (!this.metrics.has(vendorId)) {
+      this.metrics.set(vendorId, { totalRequests: 0, failures: 0, totalLatency: 0 });
+    }
   }
 
-  recordError(vendorId) {
-    // TODO: Increment error count
+  record(vendorId, latency, isSuccess) {
+    this._initialize(vendorId);
+    const data = this.metrics.get(vendorId);
+    
+    data.totalRequests += 1;
+    data.totalLatency += latency;
+    if (!isSuccess) data.failures += 1;
   }
 
-  getVendorMetrics(vendorId) {
-    // TODO: Return current metrics (error rate, latency) for failover evaluation
+  getHealth(vendorId) {
+    this._initialize(vendorId);
+    const data = this.metrics.get(vendorId);
+    
+    if (data.totalRequests === 0) return { errorRate: 0, avgLatency: 0 };
+    
+    return {
+      errorRate: data.failures / data.totalRequests,
+      avgLatency: data.totalLatency / data.totalRequests
+    };
+  }
+
+  getAllMetrics() {
+    return Object.fromEntries(this.metrics);
   }
 }
+
+// Export as a singleton so all requests share the same metrics map
+export const metricsService = new MetricsService();
