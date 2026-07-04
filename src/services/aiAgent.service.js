@@ -6,7 +6,7 @@ import { metricsService } from './metrics.service.js';
 export class AiAgentService {
   constructor() {
     this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    this.model = this.genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' });
   }
 
   async generateVendorConfig(userInstructions) {

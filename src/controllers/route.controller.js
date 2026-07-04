@@ -12,18 +12,25 @@ export class RouteController {
 
   async executeRoute(req, res, next) {
     try {
-      const { capability, payload, requirements } = req.body;
+      const body = req.body || {};
+      const { capability, payload, requirements } = body;
 
-      if (!capability || !payload) {
+      if (!capability || typeof capability !== 'string' || !payload || typeof payload !== 'object' || Array.isArray(payload)) {
         return res.status(400).json({
           status: 'ERROR',
-          message: 'Capability and payload are required.'
+          message: 'Valid capability (string) and payload (object) are required.'
         });
       }
 
       const result = await this.routingEngine.executeRoute(capability, payload, requirements || {});
       return res.status(200).json(result);
     } catch (error) {
+      if (error.message && error.message.includes('No vendors found for capability')) {
+        return res.status(404).json({
+          status: 'ERROR',
+          message: error.message
+        });
+      }
       next(error);
     }
   }

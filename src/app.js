@@ -27,15 +27,23 @@ export class App {
 
     this.app.use('/', apiRouter.getRouter());
     this.app.use('/vendors', vendorRouter.getRouter());
+
+    // 404 handler for API routes
+    this.app.use((req, res, next) => {
+      res.status(404).json({
+        status: 'ERROR',
+        message: `Route ${req.method} ${req.originalUrl} not found`
+      });
+    });
   }
 
   configureErrorHandling() {
     this.app.use((err, req, res, next) => {
       console.error('Unhandled Server Exception:', err.stack);
-      res.status(err.status || 500).json({
+      const statusCode = err.status || 500;
+      res.status(statusCode).json({
         status: 'ERROR',
-        message: err.message || 'An internal server error occurred.',
-        error: process.env.NODE_ENV === 'development' ? err.stack : {}
+        message: statusCode >= 500 ? 'An internal server error occurred.' : err.message
       });
     });
   }

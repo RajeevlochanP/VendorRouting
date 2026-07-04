@@ -16,6 +16,19 @@ export class VendorController {
         data: vendorObj
       });
     } catch (error) {
+      if (error.code === 11000) {
+        return res.status(409).json({
+          status: 'ERROR',
+          message: 'Vendor with this name already exists.'
+        });
+      }
+      if (error.name === 'ValidationError') {
+        return res.status(400).json({
+          status: 'ERROR',
+          message: 'Invalid vendor schema.',
+          details: error.message
+        });
+      }
       next(error);
     }
   }
