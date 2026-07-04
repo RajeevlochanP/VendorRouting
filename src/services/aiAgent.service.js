@@ -6,17 +6,11 @@ import { metricsService } from './metrics.service.js';
 export class AiAgentService {
   constructor() {
     this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-    // Using gemini-1.5-flash for rapid, cost-effective infrastructure decisions
     this.model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
   }
 
-  /**
-   * Generates or optimizes vendor configurations by combining natural language requirements
-   * with real-time database schema information, system health metrics, and failure logs.
-   */
   async generateVendorConfig(userInstructions) {
     try {
-      // 1. Fetch current system context
       const currentVendorsRaw = await Vendor.find({}, 'name capability priority weight costPerRequest maxLatencyMs rateLimitPerMinute');
 
       const vendorMap = {};
@@ -27,23 +21,20 @@ export class AiAgentService {
         return obj;
       });
 
-      const rawMetrics = metricsService.getAllMetrics(); // Fetches live in-memory O(1) performance states
+      const rawMetrics = metricsService.getAllMetrics();
 
-      // Map metrics to use human-readable vendor names to blend with the rest of the codebase
       const liveMetrics = {};
       for (const [vendorId, data] of Object.entries(rawMetrics)) {
         const vendorName = vendorMap[vendorId] || vendorId;
         liveMetrics[vendorName] = data;
       }
 
-      // Fetch recent system failures to let the AI see if a vendor is currently behaving poorly
       const recentFailures = await RouteLog.find({ isSuccess: false })
         .sort({ createdAt: -1 })
         .limit(5)
         .select('-_id vendorUsed routingReason latencyMs capability')
         .lean();
 
-      // 2. Build the Context-Aware System Prompt
       const systemPrompt = `You are a Principal Infrastructure AI Agent managing an Intelligent Vendor Routing Platform.
 Your task is to analyze the user's natural language request along with the current live system state, health metrics, and recent failures to generate an optimized array of Vendor configuration objects.
 
@@ -74,11 +65,9 @@ You must output a strict JSON array matching our VendorSchema parameters:
 --- USER COMMAND ---
 "${userInstructions}"`;
 
-      // 3. Fire the context-dense request to Gemini
       const result = await this.model.generateContent(systemPrompt);
       const text = result.response.text().trim();
 
-      // Sanitization step to strip out unintended markdown formatting from the LLM response
       let jsonStr = text;
       if (jsonStr.startsWith('```json')) {
         jsonStr = jsonStr.substring(7);
@@ -89,7 +78,6 @@ You must output a strict JSON array matching our VendorSchema parameters:
         jsonStr = jsonStr.substring(0, jsonStr.length - 3);
       }
 
-      // Parse the contextually optimized configuration array
       const optimizedConfig = JSON.parse(jsonStr.trim());
       return optimizedConfig;
 

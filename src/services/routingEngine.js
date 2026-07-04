@@ -70,36 +70,33 @@ export class RoutingEngine {
           vendorUsed: selectedVendor.name,
           routingStrategy: strategyType,
           routingReason,
-          latencyMs: Date.now() - startTime, // Total time including retries
+          latencyMs: Date.now() - startTime,
           isSuccess: true,
           cost: selectedVendor.costPerRequest,
           requestPayload: payload,
           responsePayload: vendorResponse
         });
 
-        // Return the exact sample output format
         return {
           status: 'SUCCESS',
           vendorUsed: selectedVendor.name,
           routingReason,
-          latencyMs: latency, // Latency of the successful call
+          latencyMs: latency,
           cost: selectedVendor.costPerRequest,
           response: vendorResponse.data
         };
 
       } catch (error) {
-        // FAILOVER TRIGGERED: Execution failed. 
         const latency = Date.now() - attemptStartTime;
         metricsService.record(selectedVendor._id.toString(), latency, false);
         
         failedVendorIds.add(selectedVendor._id.toString());
         executionLog.push(`Attempt ${attempt + 1}: ${selectedVendor.name} failed (${error.message}). Triggering failover.`);
         
-        attempt++; // Increment and try the next best vendor
+        attempt++;
       }
     }
 
-    // 4. Exhausted all retries or ran out of vendors
     const totalLatency = Date.now() - startTime;
     await RouteLog.create({
       capability,

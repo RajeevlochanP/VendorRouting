@@ -20,7 +20,6 @@ export class DynamicScoringStrategy {
     const minCost = Math.min(...vendorStats.map(v => v.cost));
     const minLatency = Math.min(...vendorStats.map(v => v.latency));
 
-    // Calculate scores for all vendors
     vendorStats.forEach(stat => {
       let score = 0;
       let criteriaCount = 0;
@@ -37,15 +36,12 @@ export class DynamicScoringStrategy {
       stat.finalScore = criteriaCount > 0 ? (score / criteriaCount) : 0;
     });
 
-    // 1. Find the highest score
     const highestScore = Math.max(...vendorStats.map(v => v.finalScore));
 
-    // 2. Group ALL vendors that have a score effectively tied for 1st place
     const topScorers = vendorStats
       .filter(v => Math.abs(v.finalScore - highestScore) < 0.1)
       .map(v => v.vendor);
 
-    // 3. Break the tie using the Weighted Strategy
     return this.weightedSelector.selectVendor(topScorers);
   }
 }

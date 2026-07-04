@@ -15,7 +15,6 @@ export class VendorExecutionClient {
     }
   }
 
-  // --- 1. THE PRODUCTION ENGINE (Real HTTP Calls) ---
   async _executeRealCall(vendor, payload) {
     const startTime = Date.now();
     let currentResponse = null;
@@ -25,10 +24,8 @@ export class VendorExecutionClient {
         throw new Error(`Vendor ${vendor.name} is missing integration configurations.`);
       }
 
-      // Execute each step sequentially (handles tokens -> execution pipelines)
       for (const step of vendor.integration.steps) {
         
-        // 1. Prepare Headers and Authentication
         const headers = { 'Content-Type': 'application/json' };
         if (step.auth && step.auth.type !== 'NONE') {
           if (step.auth.type === 'BEARER') {
@@ -38,10 +35,8 @@ export class VendorExecutionClient {
           }
         }
 
-        // 2. Map the Request Payload using the template
         const body = this._applyRequestTemplate(step.requestTemplate, payload);
         
-        // 3. Fire the real HTTP request
         const response = await fetch(step.endpoint, {
           method: step.method,
           headers,
@@ -77,13 +72,12 @@ export class VendorExecutionClient {
       };
 
     } catch (error) {
-      // Throwing this bubbles it straight back to the RoutingEngine's catch block to trigger failover
       throw new Error(`Live execution failed for ${vendor.name}: ${error.message}`);
     }
   }
 
   _applyRequestTemplate(template, payload) {
-    if (!template) return payload; // Fallback if no template provided
+    if (!template) return payload;
 
     let templateString = JSON.stringify(template);
     

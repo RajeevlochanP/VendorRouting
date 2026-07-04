@@ -16,15 +16,12 @@ export class LatencyStrategy {
       };
     });
 
-    // 1. Find the absolute fastest latency
     const minLatency = Math.min(...vendorsWithMetrics.map(v => v.avgLatency));
 
-    // 2. Group ALL vendors that share this fastest time
     const tiedFastestVendors = vendorsWithMetrics
       .filter(v => v.avgLatency === minLatency)
       .map(v => v.vendor);
 
-    // 3. Break the tie using the Weighted Strategy
     return this.weightedSelector.selectVendor(tiedFastestVendors);
   }
 }

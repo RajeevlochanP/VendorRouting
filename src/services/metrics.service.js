@@ -1,4 +1,3 @@
-// Acts as an in-memory store for fast metric tracking
 export class MetricsService {
   constructor() {
     this.metrics = new Map();
@@ -36,5 +35,4 @@ export class MetricsService {
   }
 }
 
-// Export as a singleton so all requests share the same metrics map
 export const metricsService = new MetricsService();
